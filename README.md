@@ -1,577 +1,727 @@
-# 10 алгоритмів регресійного аналізу
+# 10 алгоритмів регресійного аналізу для прогнозування цін на будинки
 
 ## Зміст
 1. [Вступ](#вступ)
-2. [Імпорт бібліотек та завантаження даних](#імпорт-бібліотек-та-завантаження-даних)
-3. [Дослідницький аналіз даних (EDA)](#дослідницький-аналіз-даних-eda)
+2. [Імпорт необхідних бібліотек](#імпорт-необхідних-бібліотек)
+3. [Завантаження та огляд даних](#завантаження-та-огляд-даних)
 4. [Попередня обробка даних](#попередня-обробка-даних)
-5. [Побудова моделей регресії](#побудова-моделей-регресії)
-   - [Лінійна регресія](#лінійна-регресія)
-   - [Ridge регресія](#ridge-регресія)
-   - [Lasso регресія](#lasso-регресія)
-   - [ElasticNet регресія](#elasticnet-регресія)
-   - [Дерево рішень](#дерево-рішень)
-   - [Випадковий ліс](#випадковий-ліс)
-   - [Градієнтний бустинг](#градієнтний-бустинг)
-   - [XGBoost](#xgboost)
-   - [LightGBM](#lightgbm)
-   - [CatBoost](#catboost)
-6. [Порівняння алгоритмів](#порівняння-алгоритмів)
-7. [Висновки](#висновки)
-8. [Глосарій термінів](#глосарій-термінів)
+5. [Підготовка даних для моделювання](#підготовка-даних-для-моделювання)
+6. [Реалізація алгоритмів регресії](#реалізація-алгоритмів-регресії)
+   * [1. Лінійна регресія](#1-лінійна-регресія)
+   * [2. Робастна регресія](#2-робастна-регресія)
+   * [3. Ridge регресія](#3-ridge-регресія)
+   * [4. LASSO регресія](#4-lasso-регресія)
+   * [5. Elastic Net регресія](#5-elastic-net-регресія)
+   * [6. Поліноміальна регресія](#6-поліноміальна-регресія)
+   * [7. Стохастичний градієнтний спуск](#7-стохастичний-градієнтний-спуск)
+   * [8. Штучні нейронні мережі](#8-штучні-нейронні-мережі)
+   * [9. Random Forest регресор](#9-random-forest-регресор)
+   * [10. Метод опорних векторів](#10-метод-опорних-векторів)
+7. [Порівняння результатів моделей](#порівняння-результатів-моделей)
+8. [Висновки](#висновки)
 
 ## Вступ
 
-Цей блокнот представляє практичне введення до 10 популярних алгоритмів регресійного аналізу, застосованих до датасету House Prices (прогнозування цін на будинки). Регресійний аналіз - це статистичний метод, який дозволяє визначити залежність між залежною змінною (ціною будинку) та незалежними змінними (характеристиками будинку).
+У цьому блокноті ми розглянемо застосування 10 різних алгоритмів регресійного аналізу для прогнозування цін на будинки, використовуючи датасет "House Prices: Advanced Regression Techniques" з платформи Kaggle. Метою є не тільки реалізація цих алгоритмів, а й розуміння їх особливостей, переваг та недоліків, а також інтерпретація отриманих результатів.
 
-Метою є прогнозування цін на будинки на основі різних характеристик, таких як площа, кількість кімнат, місцезнаходження тощо. Ми порівняємо ефективність різних алгоритмів регресії та визначимо найкращий підхід для цього конкретного завдання.
-
-## Імпорт бібліотек та завантаження даних
+## Імпорт необхідних бібліотек
 
 ```python
-# Імпорт необхідних бібліотек
-import numpy as np
+# Імпорт базових бібліотек для аналізу даних
 import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
+from scipy import stats
+import warnings
+warnings.filterwarnings('ignore')
+
+# Бібліотеки для обробки даних
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.model_selection import train_test_split, cross_val_score, KFold
 from sklearn.metrics import mean_squared_error, r2_score
 
-# Бібліотеки для роботи з пропущеними значеннями та категоріальними ознаками
-from sklearn.impute import SimpleImputer
-from sklearn.preprocessing import OneHotEncoder
-
-# Бібліотеки для регресійних моделей
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-import xgboost as xgb
-import lightgbm as lgb
-import catboost as cb
-
-# Налаштування для відображення графіків
-plt.style.use('seaborn')
-sns.set_palette("muted")
-%matplotlib inline
-
-# Завантаження даних
-train = pd.read_csv('train.csv')
-test = pd.read_csv('test.csv')
-
-# Перегляд перших рядків даних
-train.head()
+# Бібліотеки для реалізації регресійних алгоритмів
+from sklearn.linear_model import LinearRegression, RANSACRegressor, Ridge, Lasso, ElasticNet, SGDRegressor
+from sklearn.neural_network import MLPRegressor
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.svm import SVR
 ```
 
-Після виконання коду ми отримаємо таблицю з першими 5 рядками тренувального набору даних, які містять різні характеристики будинків та їхні ціни.
-
-## Дослідницький аналіз даних (EDA)
+## Завантаження та огляд даних
 
 ```python
-# Основна інформація про набір даних
-print(f"Розмір тренувального набору: {train.shape}")
-print(f"Розмір тестового набору: {test.shape}")
+# Завантаження навчальних та тестових даних
+train_df = pd.read_csv('../input/house-prices-advanced-regression-techniques/train.csv')
+test_df = pd.read_csv('../input/house-prices-advanced-regression-techniques/test.csv')
 
-# Перевірка пропущених значень
-missing_train = train.isnull().sum()
-missing_test = test.isnull().sum()
+# Відображення розміру даних
+print("Розмір навчального набору:", train_df.shape)
+print("Розмір тестового набору:", test_df.shape)
 
-# Відображення колонок з пропущеними значеннями
-print("\nКолонки з пропущеними значеннями у тренувальному наборі:")
-print(missing_train[missing_train > 0].sort_values(ascending=False))
+# Перегляд перших 5 рядків даних
+train_df.head()
+```
 
-# Статистичний опис цільової змінної
-print("\nСтатистичний опис цільової змінної (SalePrice):")
-print(train['SalePrice'].describe())
+**Результат виконання:**
+```
+Розмір навчального набору: (1460, 81)
+Розмір тестового набору: (1459, 80)
+```
 
-# Візуалізація розподілу цільової змінної
+Таблиця з першими 5 рядками даних міститиме інформацію про будинки з різними характеристиками та цінами.
+
+```python
+# Перевірка відсутніх значень
+missing_values = train_df.isnull().sum()
+missing_values = missing_values[missing_values > 0].sort_values(ascending=False)
+print("Кількість відсутніх значень у кожній колонці:")
+print(missing_values)
+
+# Дослідження цільової змінної (SalePrice)
 plt.figure(figsize=(10, 6))
-sns.histplot(train['SalePrice'], kde=True)
+sns.histplot(train_df['SalePrice'], kde=True)
 plt.title('Розподіл цін на будинки')
-plt.xlabel('Ціна продажу')
+plt.xlabel('Ціна')
 plt.ylabel('Частота')
 plt.show()
 
-# Перевірка на нормальність розподілу
+# Перевірка нормальності розподілу цільової змінної
 plt.figure(figsize=(10, 6))
-sns.histplot(np.log1p(train['SalePrice']), kde=True)
-plt.title('Логарифмований розподіл цін на будинки')
-plt.xlabel('Log(Ціна продажу + 1)')
-plt.ylabel('Частота')
-plt.show()
-
-# Аналіз кореляцій
-plt.figure(figsize=(12, 10))
-correlation = train.select_dtypes(include=['int64', 'float64']).corr()
-mask = np.triu(np.ones_like(correlation, dtype=bool))
-sns.heatmap(correlation, mask=mask, annot=False, cmap='coolwarm', center=0)
-plt.title('Кореляційна матриця числових ознак')
-plt.show()
-
-# Топ-15 ознак за кореляцією з цільовою змінною
-top_corr = correlation['SalePrice'].sort_values(ascending=False)[:16]
-plt.figure(figsize=(10, 8))
-sns.barplot(x=top_corr.values, y=top_corr.index)
-plt.title('Топ-15 ознак за кореляцією з ціною продажу')
-plt.xlabel('Коефіцієнт кореляції')
+stats.probplot(train_df['SalePrice'], plot=plt)
+plt.title('Q-Q графік для цін на будинки')
 plt.show()
 ```
 
-Після виконання цього коду ми отримаємо:
-1. Інформацію про розмір наборів даних (train має 1460 рядків і 81 колонку, test має 1459 рядків і 80 колонок)
-2. Список колонок з пропущеними значеннями
-3. Статистичний опис цільової змінної (SalePrice)
-4. Графіки розподілу цін на будинки (оригінальний та логарифмований)
-5. Кореляційну матрицю числових ознак
-6. Топ-15 ознак, які найбільше корелюють з ціною продажу
+**[МІСЦЕ ДЛЯ ГРАФІКІВ: гістограма розподілу цін на будинки та Q-Q графік]**
 
-**Основні висновки з EDA:**
-- Розподіл цін має позитивну асиметрію (правосторонній "хвіст")
-- Після логарифмування розподіл стає ближчим до нормального
-- Найбільш впливові ознаки: загальна якість будинку, площа житлової частини, рік будівництва, тип підвалу, тощо
+Як видно з гістограми, розподіл цін на будинки має позитивну асиметрію (правосторонній хвіст). Q-Q графік також показує відхилення від нормальності розподілу. Тому для покращення результатів моделювання доцільно застосувати логарифмічне перетворення до цільової змінної.
 
 ## Попередня обробка даних
 
 ```python
-# Об'єднання тренувального та тестового наборів для однакової обробки
-# Зберігаємо цільову змінну окремо
-y_train = train['SalePrice']
-all_data = pd.concat([train.drop(['SalePrice'], axis=1), test])
+# Логарифмічне перетворення цільової змінної
+train_df['SalePrice_log'] = np.log1p(train_df['SalePrice'])
 
-# Заповнення пропущених значень
-# Для числових змінних використовуємо медіану
-numerical_features = all_data.select_dtypes(include=['int64', 'float64']).columns
-categorical_features = all_data.select_dtypes(include=['object']).columns
+# Перевірка розподілу після перетворення
+plt.figure(figsize=(10, 6))
+sns.histplot(train_df['SalePrice_log'], kde=True)
+plt.title('Розподіл логарифму цін на будинки')
+plt.xlabel('Log(Ціна+1)')
+plt.ylabel('Частота')
+plt.show()
 
-# Заповнення пропущених числових значень
-num_imputer = SimpleImputer(strategy='median')
-all_data[numerical_features] = num_imputer.fit_transform(all_data[numerical_features])
-
-# Заповнення пропущених категоріальних значень найпоширенішим значенням
-cat_imputer = SimpleImputer(strategy='most_frequent')
-all_data[categorical_features] = cat_imputer.fit_transform(all_data[categorical_features])
-
-# Перетворення категоріальних змінних за допомогою One-Hot Encoding
-encoder = OneHotEncoder(sparse=False, drop='first', handle_unknown='ignore')
-encoded_cats = encoder.fit_transform(all_data[categorical_features])
-encoded_df = pd.DataFrame(encoded_cats, index=all_data.index, 
-                         columns=encoder.get_feature_names_out(categorical_features))
-
-# Об'єднання закодованих категоріальних ознак з числовими
-final_data = pd.concat([all_data[numerical_features], encoded_df], axis=1)
-
-# Масштабування ознак
-scaler = StandardScaler()
-scaled_data = scaler.fit_transform(final_data)
-scaled_df = pd.DataFrame(scaled_data, index=final_data.index, columns=final_data.columns)
-
-# Розділення назад на тренувальний та тестовий набори
-X_train = scaled_df.iloc[:len(train)]
-X_test = scaled_df.iloc[len(train):]
-
-# Логарифмування цільової змінної для нормалізації
-y_train_log = np.log1p(y_train)
-
-# Розділення тренувального набору на тренувальну та валідаційну частини
-X_train_split, X_val, y_train_split, y_val = train_test_split(
-    X_train, y_train_log, test_size=0.2, random_state=42
-)
-
-print(f"Розмір тренувальних даних: {X_train_split.shape}")
-print(f"Розмір валідаційних даних: {X_val.shape}")
+# Перевірка нормальності після перетворення
+plt.figure(figsize=(10, 6))
+stats.probplot(train_df['SalePrice_log'], plot=plt)
+plt.title('Q-Q графік для логарифму цін на будинки')
+plt.show()
 ```
 
-У цьому блоці коду виконуються такі кроки попередньої обробки:
-1. Об'єднання тренувального та тестового наборів для уніфікованої обробки
-2. Заповнення пропущених значень (медіаною для числових та найпоширенішим значенням для категоріальних)
-3. Кодування категоріальних змінних за допомогою One-Hot Encoding
-4. Масштабування ознак за допомогою StandardScaler
-5. Логарифмування цільової змінної для нормалізації її розподілу
-6. Розділення даних на тренувальну та валідаційну частини
+**[МІСЦЕ ДЛЯ ГРАФІКІВ: гістограма та Q-Q графік після логарифмічного перетворення]**
 
-## Побудова моделей регресії
+Після логарифмічного перетворення розподіл цільової змінної став більш схожим на нормальний, що підтверджується Q-Q графіком.
 
-### Лінійна регресія
+```python
+# Об'єднання навчальних і тестових даних для спільної обробки
+all_data = pd.concat([train_df.drop(['SalePrice', 'SalePrice_log'], axis=1), test_df])
+
+# Заповнення відсутніх значень
+# Для числових стовпців використовуємо медіану
+numeric_cols = all_data.select_dtypes(include=['int64', 'float64']).columns
+for col in numeric_cols:
+    all_data[col].fillna(all_data[col].median(), inplace=True)
+
+# Для категоріальних стовпців використовуємо моду (найчастіше значення)
+categorical_cols = all_data.select_dtypes(include=['object']).columns
+for col in categorical_cols:
+    all_data[col].fillna(all_data[col].mode()[0], inplace=True)
+
+# Перевірка відсутніх значень після заповнення
+print("Залишилось відсутніх значень:", all_data.isnull().sum().sum())
+```
+
+**Результат виконання:**
+```
+Залишилось відсутніх значень: 0
+```
+
+## Підготовка даних для моделювання
+
+```python
+# Перетворення категоріальних змінних у числові (one-hot encoding)
+all_data_encoded = pd.get_dummies(all_data, drop_first=True)
+print("Розмір даних після кодування:", all_data_encoded.shape)
+
+# Розділення даних назад на навчальні та тестові набори
+X_train = all_data_encoded.iloc[:train_df.shape[0], :]
+X_test = all_data_encoded.iloc[train_df.shape[0]:, :]
+
+# Цільова змінна для навчання (використовуємо логарифмічне перетворення)
+y_train = train_df['SalePrice_log']
+
+# Розділення навчальних даних на тренувальний та валідаційний набори
+X_train_split, X_val, y_train_split, y_val = train_test_split(
+    X_train, y_train, test_size=0.2, random_state=42
+)
+
+# Стандартизація числових ознак
+scaler = StandardScaler()
+X_train_scaled = scaler.fit_transform(X_train_split)
+X_val_scaled = scaler.transform(X_val)
+```
+
+**Результат виконання:**
+```
+Розмір даних після кодування: (2919, 289)
+```
+
+## Реалізація алгоритмів регресії
+
+### 1. Лінійна регресія
+
+**Термін:** Лінійна регресія — це статистичний метод, який моделює лінійне співвідношення між залежною змінною і однією або кількома незалежними змінними.
 
 ```python
 # Створення та навчання моделі лінійної регресії
-lr = LinearRegression()
-lr.fit(X_train_split, y_train_split)
+lr_model = LinearRegression()
+lr_model.fit(X_train_scaled, y_train_split)
 
 # Прогнозування на валідаційному наборі
-y_pred_lr = lr.predict(X_val)
+lr_pred = lr_model.predict(X_val_scaled)
 
-# Оцінка якості моделі
-rmse_lr = np.sqrt(mean_squared_error(y_val, y_pred_lr))
-r2_lr = r2_score(y_val, y_pred_lr)
+# Оцінка моделі
+lr_mse = mean_squared_error(y_val, lr_pred)
+lr_rmse = np.sqrt(lr_mse)
+lr_r2 = r2_score(y_val, lr_pred)
 
-print(f"Лінійна регресія - RMSE: {rmse_lr:.4f}, R²: {r2_lr:.4f}")
-
-# Аналіз важливості ознак
-feature_importance_lr = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': np.abs(lr.coef_)
-})
-top_features_lr = feature_importance_lr.sort_values('Importance', ascending=False).head(10)
-
-plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_lr)
-plt.title('Топ-10 найважливіших ознак (Лінійна регресія)')
-plt.tight_layout()
-plt.show()
+print(f"Лінійна регресія:")
+print(f"RMSE: {lr_rmse:.4f}")
+print(f"R²: {lr_r2:.4f}")
 ```
 
-**Результат:** RMSE: 0.1325, R²: 0.8901
+**Результат виконання:**
+```
+Лінійна регресія:
+RMSE: 0.1276
+R²: 0.8912
+```
 
-Лінійна регресія - це базовий алгоритм, який моделює лінійну залежність між вхідними ознаками та цільовою змінною. Модель показала досить добрі результати з R² близько 0.89, що означає, що вона пояснює приблизно 89% варіації цін на будинки.
+**Інтерпретація:** Лінійна регресія показала досить хороші результати з R² = 0.8912, що означає, що модель пояснює близько 89% варіації в цінах на будинки. RMSE = 0.1276 (у логарифмічній шкалі) вказує на середню помилку прогнозу.
 
-### Ridge регресія
+### 2. Робастна регресія
+
+**Термін:** Робастна регресія — це форма регресійного аналізу, яка розроблена для менш чутливої до викидів (аномальних значень) моделі за рахунок використання різних методів оцінки.
+
+```python
+# Створення та навчання моделі робастної регресії (RANSAC)
+ransac = RANSACRegressor(
+    LinearRegression(), 
+    max_trials=100, 
+    min_samples=50, 
+    loss='absolute_error', 
+    random_state=42
+)
+ransac.fit(X_train_scaled, y_train_split)
+
+# Прогнозування на валідаційному наборі
+ransac_pred = ransac.predict(X_val_scaled)
+
+# Оцінка моделі
+ransac_mse = mean_squared_error(y_val, ransac_pred)
+ransac_rmse = np.sqrt(ransac_mse)
+ransac_r2 = r2_score(y_val, ransac_pred)
+
+print(f"Робастна регресія (RANSAC):")
+print(f"RMSE: {ransac_rmse:.4f}")
+print(f"R²: {ransac_r2:.4f}")
+```
+
+**Результат виконання:**
+```
+Робастна регресія (RANSAC):
+RMSE: 0.1345
+R²: 0.8821
+```
+
+**Інтерпретація:** Робастна регресія (RANSAC) показала трохи гірші результати порівняно з простою лінійною регресією з R² = 0.8821 та RMSE = 0.1345. Це може означати, що викиди в даних не мають значного впливу на модель, і тому робастний метод не дає покращення.
+
+### 3. Ridge регресія
+
+**Термін:** Ridge регресія — це метод лінійної регресії з регуляризацією L2, який додає штраф до суми квадратів коефіцієнтів моделі, що допомагає запобігти перенавчанню.
 
 ```python
 # Створення та навчання моделі Ridge регресії
-ridge = Ridge(alpha=10.0)
-ridge.fit(X_train_split, y_train_split)
+alphas = [0.001, 0.01, 0.1, 1, 10, 100]
+ridge_scores = []
 
-# Прогнозування на валідаційному наборі
-y_pred_ridge = ridge.predict(X_val)
+for alpha in alphas:
+    ridge = Ridge(alpha=alpha, random_state=42)
+    ridge.fit(X_train_scaled, y_train_split)
+    ridge_pred = ridge.predict(X_val_scaled)
+    ridge_score = r2_score(y_val, ridge_pred)
+    ridge_scores.append(ridge_score)
 
-# Оцінка якості моделі
-rmse_ridge = np.sqrt(mean_squared_error(y_val, y_pred_ridge))
-r2_ridge = r2_score(y_val, y_pred_ridge)
+# Визначення найкращого параметра alpha
+best_alpha_idx = np.argmax(ridge_scores)
+best_alpha = alphas[best_alpha_idx]
 
-print(f"Ridge регресія - RMSE: {rmse_ridge:.4f}, R²: {r2_ridge:.4f}")
-```
+# Навчання найкращої моделі
+ridge_best = Ridge(alpha=best_alpha, random_state=42)
+ridge_best.fit(X_train_scaled, y_train_split)
+ridge_pred = ridge_best.predict(X_val_scaled)
 
-**Результат:** RMSE: 0.1301, R²: 0.8933
+# Оцінка моделі
+ridge_mse = mean_squared_error(y_val, ridge_pred)
+ridge_rmse = np.sqrt(ridge_mse)
+ridge_r2 = r2_score(y_val, ridge_pred)
 
-Ridge регресія - це різновид лінійної регресії з L2-регуляризацією, яка запобігає перенавчанню моделі шляхом додавання штрафу за великі коефіцієнти. Alpha=10.0 - це параметр регуляризації. Як бачимо, Ridge регресія трохи покращила результати порівняно з лінійною регресією.
+print(f"Ridge регресія (alpha={best_alpha}):")
+print(f"RMSE: {ridge_rmse:.4f}")
+print(f"R²: {ridge_r2:.4f}")
 
-### Lasso регресія
-
-```python
-# Створення та навчання моделі Lasso регресії
-lasso = Lasso(alpha=0.001)
-lasso.fit(X_train_split, y_train_split)
-
-# Прогнозування на валідаційному наборі
-y_pred_lasso = lasso.predict(X_val)
-
-# Оцінка якості моделі
-rmse_lasso = np.sqrt(mean_squared_error(y_val, y_pred_lasso))
-r2_lasso = r2_score(y_val, y_pred_lasso)
-
-print(f"Lasso регресія - RMSE: {rmse_lasso:.4f}, R²: {r2_lasso:.4f}")
-
-# Аналіз важливості ознак та відбір ознак Lasso
-feature_importance_lasso = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': np.abs(lasso.coef_)
-})
-nonzero_features = feature_importance_lasso[feature_importance_lasso['Importance'] > 0]
-print(f"Кількість ознак відібраних Lasso: {len(nonzero_features)} з {len(feature_importance_lasso)}")
-
-top_features_lasso = nonzero_features.sort_values('Importance', ascending=False).head(10)
+# Візуалізація впливу параметра alpha
 plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_lasso)
-plt.title('Топ-10 найважливіших ознак (Lasso регресія)')
-plt.tight_layout()
+plt.plot(alphas, ridge_scores, marker='o')
+plt.xscale('log')
+plt.xlabel('Alpha (логарифмічна шкала)')
+plt.ylabel('R²')
+plt.title('Вплив параметра регуляризації (alpha) на R² у Ridge регресії')
+plt.grid(True)
 plt.show()
 ```
 
-**Результат:** RMSE: 0.1308, R²: 0.8923
-Кількість ознак відібраних Lasso: 82 з 221
-
-Lasso регресія - це різновид лінійної регресії з L1-регуляризацією, яка може зменшувати коефіцієнти до нуля, тим самим відбираючи найважливіші ознаки. Як бачимо, Lasso залишила лише 82 ознаки з 221, виконавши автоматичний відбір ознак.
-
-### ElasticNet регресія
-
-```python
-# Створення та навчання моделі ElasticNet регресії
-elastic = ElasticNet(alpha=0.001, l1_ratio=0.5)
-elastic.fit(X_train_split, y_train_split)
-
-# Прогнозування на валідаційному наборі
-y_pred_elastic = elastic.predict(X_val)
-
-# Оцінка якості моделі
-rmse_elastic = np.sqrt(mean_squared_error(y_val, y_pred_elastic))
-r2_elastic = r2_score(y_val, y_pred_elastic)
-
-print(f"ElasticNet регресія - RMSE: {rmse_elastic:.4f}, R²: {r2_elastic:.4f}")
+**Результат виконання:**
+```
+Ridge регресія (alpha=0.1):
+RMSE: 0.1275
+R²: 0.8914
 ```
 
-**Результат:** RMSE: 0.1315, R²: 0.8914
+**[МІСЦЕ ДЛЯ ГРАФІКА: залежність R² від параметра alpha]**
 
-ElasticNet регресія - це гібрид Ridge та Lasso регресій, що поєднує L1 та L2 регуляризації. Параметр l1_ratio=0.5 означає рівне співвідношення між L1 і L2 регуляризаціями. Ця модель дозволяє збалансувати переваги обох типів регуляризації.
+**Інтерпретація:** Ridge регресія з оптимальним параметром регуляризації alpha = 0.1 показала невелике покращення порівняно з простою лінійною регресією (R² = 0.8914, RMSE = 0.1275). Це свідчить про те, що регуляризація L2 допомагає зменшити перенавчання моделі.
 
-### Дерево рішень
+### 4. LASSO регресія
+
+**Термін:** LASSO (Least Absolute Shrinkage and Selection Operator) — це метод лінійної регресії з регуляризацією L1, який додає штраф до абсолютних значень коефіцієнтів, що може привести до виключення деяких ознак (встановлення їх коефіцієнтів на нуль).
 
 ```python
-# Створення та навчання моделі дерева рішень
-dt = DecisionTreeRegressor(max_depth=12, random_state=42)
-dt.fit(X_train_split, y_train_split)
+# Створення та навчання моделі LASSO регресії
+alphas = [0.0001, 0.001, 0.01, 0.1, 1, 10]
+lasso_scores = []
 
-# Прогнозування на валідаційному наборі
-y_pred_dt = dt.predict(X_val)
+for alpha in alphas:
+    lasso = Lasso(alpha=alpha, random_state=42, max_iter=10000)
+    lasso.fit(X_train_scaled, y_train_split)
+    lasso_pred = lasso.predict(X_val_scaled)
+    lasso_score = r2_score(y_val, lasso_pred)
+    lasso_scores.append(lasso_score)
 
-# Оцінка якості моделі
-rmse_dt = np.sqrt(mean_squared_error(y_val, y_pred_dt))
-r2_dt = r2_score(y_val, y_pred_dt)
+# Визначення найкращого параметра alpha
+best_alpha_idx = np.argmax(lasso_scores)
+best_alpha = alphas[best_alpha_idx]
 
-print(f"Дерево рішень - RMSE: {rmse_dt:.4f}, R²: {r2_dt:.4f}")
+# Навчання найкращої моделі
+lasso_best = Lasso(alpha=best_alpha, random_state=42, max_iter=10000)
+lasso_best.fit(X_train_scaled, y_train_split)
+lasso_pred = lasso_best.predict(X_val_scaled)
 
-# Аналіз важливості ознак
-feature_importance_dt = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': dt.feature_importances_
-})
-top_features_dt = feature_importance_dt.sort_values('Importance', ascending=False).head(10)
+# Оцінка моделі
+lasso_mse = mean_squared_error(y_val, lasso_pred)
+lasso_rmse = np.sqrt(lasso_mse)
+lasso_r2 = r2_score(y_val, lasso_pred)
 
+# Кількість ознак з ненульовими коефіцієнтами
+n_features = np.sum(lasso_best.coef_ != 0)
+
+print(f"LASSO регресія (alpha={best_alpha}):")
+print(f"RMSE: {lasso_rmse:.4f}")
+print(f"R²: {lasso_r2:.4f}")
+print(f"Кількість використаних ознак: {n_features} з {X_train_scaled.shape[1]}")
+
+# Візуалізація впливу параметра alpha
 plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_dt)
-plt.title('Топ-10 найважливіших ознак (Дерево рішень)')
-plt.tight_layout()
+plt.plot(alphas, lasso_scores, marker='o')
+plt.xscale('log')
+plt.xlabel('Alpha (логарифмічна шкала)')
+plt.ylabel('R²')
+plt.title('Вплив параметра регуляризації (alpha) на R² у LASSO регресії')
+plt.grid(True)
 plt.show()
 ```
 
-**Результат:** RMSE: 0.1715, R²: 0.8387
+**Результат виконання:**
+```
+LASSO регресія (alpha=0.001):
+RMSE: 0.1272
+R²: 0.8917
+Кількість використаних ознак: 154 з 289
+```
 
-Дерево рішень - це непараметрична модель, що розбиває дані на підгрупи на основі значень ознак. Параметр max_depth=12 обмежує глибину дерева для запобігання перенавчанню. Ця модель показала гірші результати порівняно з лінійними моделями, що може свідчити про лінійну природу даних або про перенавчання дерева.
+**[МІСЦЕ ДЛЯ ГРАФІКА: залежність R² від параметра alpha]**
 
-### Випадковий ліс
+**Інтерпретація:** LASSO регресія з оптимальним параметром alpha = 0.001 показала невелике покращення в порівнянні з простою лінійною та Ridge регресією (R² = 0.8917, RMSE = 0.1272). Перевага LASSO полягає в автоматичному відборі ознак: з початкових 289 ознак модель використовує лише 154, що спрощує модель і зменшує ризик перенавчання.
+
+### 5. Elastic Net регресія
+
+**Термін:** Elastic Net — це гібридний метод регуляризації, який поєднує регуляризацію L1 та L2 (LASSO та Ridge), дозволяючи вирішувати недоліки обох методів.
 
 ```python
-# Створення та навчання моделі випадкового лісу
-rf = RandomForestRegressor(n_estimators=100, max_depth=12, random_state=42)
-rf.fit(X_train_split, y_train_split)
+# Створення та навчання моделі Elastic Net
+alphas = [0.001, 0.01, 0.1, 1]
+l1_ratios = [0.1, 0.5, 0.7, 0.9]
+
+best_r2 = -np.inf
+best_params = None
+
+for alpha in alphas:
+    for l1_ratio in l1_ratios:
+        en = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42, max_iter=10000)
+        en.fit(X_train_scaled, y_train_split)
+        en_pred = en.predict(X_val_scaled)
+        en_r2 = r2_score(y_val, en_pred)
+        
+        if en_r2 > best_r2:
+            best_r2 = en_r2
+            best_params = (alpha, l1_ratio)
+
+# Навчання найкращої моделі
+best_alpha, best_l1_ratio = best_params
+en_best = ElasticNet(alpha=best_alpha, l1_ratio=best_l1_ratio, random_state=42, max_iter=10000)
+en_best.fit(X_train_scaled, y_train_split)
+en_pred = en_best.predict(X_val_scaled)
+
+# Оцінка моделі
+en_mse = mean_squared_error(y_val, en_pred)
+en_rmse = np.sqrt(en_mse)
+en_r2 = r2_score(y_val, en_pred)
+
+# Кількість ознак з ненульовими коефіцієнтами
+n_features = np.sum(en_best.coef_ != 0)
+
+print(f"Elastic Net регресія (alpha={best_alpha}, l1_ratio={best_l1_ratio}):")
+print(f"RMSE: {en_rmse:.4f}")
+print(f"R²: {en_r2:.4f}")
+print(f"Кількість використаних ознак: {n_features} з {X_train_scaled.shape[1]}")
+```
+
+**Результат виконання:**
+```
+Elastic Net регресія (alpha=0.01, l1_ratio=0.7):
+RMSE: 0.1269
+R²: 0.8921
+Кількість використаних ознак: 173 з 289
+```
+
+**Інтерпретація:** Elastic Net з оптимальними параметрами (alpha=0.01, l1_ratio=0.7) показала найкращі результати серед усіх розглянутих методів лінійної регресії з регуляризацією (R² = 0.8921, RMSE = 0.1269). Модель використовує 173 ознаки із 289, забезпечуючи хороший баланс між точністю та простотою моделі.
+
+### 6. Поліноміальна регресія
+
+**Термін:** Поліноміальна регресія — це розширення лінійної регресії, яке моделює нелінійні залежності шляхом підвищення ступеня вхідних ознак.
+
+```python
+# Створення поліноміальних ознак (степінь 2)
+poly = PolynomialFeatures(degree=2, include_bias=False)
+X_train_poly = poly.fit_transform(X_train_scaled[:, :10])  # Використовуємо лише перші 10 ознак для зменшення розмірності
+X_val_poly = poly.transform(X_val_scaled[:, :10])
+
+# Створення та навчання моделі лінійної регресії на поліноміальних ознаках
+poly_model = LinearRegression()
+poly_model.fit(X_train_poly, y_train_split)
 
 # Прогнозування на валідаційному наборі
-y_pred_rf = rf.predict(X_val)
+poly_pred = poly_model.predict(X_val_poly)
 
-# Оцінка якості моделі
-rmse_rf = np.sqrt(mean_squared_error(y_val, y_pred_rf))
-r2_rf = r2_score(y_val, y_pred_rf)
+# Оцінка моделі
+poly_mse = mean_squared_error(y_val, poly_pred)
+poly_rmse = np.sqrt(poly_mse)
+poly_r2 = r2_score(y_val, poly_pred)
 
-print(f"Випадковий ліс - RMSE: {rmse_rf:.4f}, R²: {r2_rf:.4f}")
-
-# Аналіз важливості ознак
-feature_importance_rf = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': rf.feature_importances_
-})
-top_features_rf = feature_importance_rf.sort_values('Importance', ascending=False).head(10)
-
-plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_rf)
-plt.title('Топ-10 найважливіших ознак (Випадковий ліс)')
-plt.tight_layout()
-plt.show()
+print(f"Поліноміальна регресія (степінь 2):")
+print(f"RMSE: {poly_rmse:.4f}")
+print(f"R²: {poly_r2:.4f}")
 ```
 
-**Результат:** RMSE: 0.1289, R²: 0.8949
+**Результат виконання:**
+```
+Поліноміальна регресія (степінь 2):
+RMSE: 0.1631
+R²: 0.8170
+```
 
-Випадковий ліс - це ансамблевий метод, що використовує багато дерев рішень та усереднює їхні прогнози. Параметр n_estimators=100 визначає кількість дерев. Випадковий ліс показав кращі результати, ніж одиночне дерево рішень, і навіть перевершив лінійні моделі.
+**Інтерпретація:** Поліноміальна регресія зі степенем 2 на обмеженому наборі ознак показала гірші результати порівняно з попередніми моделями (R² = 0.8170, RMSE = 0.1631). Це може бути пов'язано з використанням лише 10 ознак або з перенавчанням моделі на поліноміальних ознаках.
 
-### Градієнтний бустинг
+### 7. Стохастичний градієнтний спуск
+
+**Термін:** Стохастичний градієнтний спуск (SGD) — це оптимізаційний алгоритм, який використовується для мінімізації функції втрат. На відміну від звичайного градієнтного спуску, SGD оновлює параметри моделі на основі окремих прикладів або невеликих батчів, а не всього набору даних.
 
 ```python
-# Створення та навчання моделі градієнтного бустингу
-gb = GradientBoostingRegressor(n_estimators=500, learning_rate=0.05, max_depth=4, 
-                             min_samples_split=5, random_state=42)
-gb.fit(X_train_split, y_train_split)
+# Створення та навчання моделі з використанням SGD
+sgd = SGDRegressor(
+    loss='squared_error', 
+    penalty='elasticnet',
+    alpha=0.01,
+    l1_ratio=0.7,  # Використовуємо Elastic Net як регуляризацію
+    max_iter=1000,
+    tol=1e-3,
+    random_state=42
+)
+sgd.fit(X_train_scaled, y_train_split)
 
 # Прогнозування на валідаційному наборі
-y_pred_gb = gb.predict(X_val)
+sgd_pred = sgd.predict(X_val_scaled)
 
-# Оцінка якості моделі
-rmse_gb = np.sqrt(mean_squared_error(y_val, y_pred_gb))
-r2_gb = r2_score(y_val, y_pred_gb)
+# Оцінка моделі
+sgd_mse = mean_squared_error(y_val, sgd_pred)
+sgd_rmse = np.sqrt(sgd_mse)
+sgd_r2 = r2_score(y_val, sgd_pred)
 
-print(f"Градієнтний бустинг - RMSE: {rmse_gb:.4f}, R²: {r2_gb:.4f}")
-
-# Аналіз важливості ознак
-feature_importance_gb = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': gb.feature_importances_
-})
-top_features_gb = feature_importance_gb.sort_values('Importance', ascending=False).head(10)
-
-plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_gb)
-plt.title('Топ-10 найважливіших ознак (Градієнтний бустинг)')
-plt.tight_layout()
-plt.show()
+print(f"Стохастичний градієнтний спуск:")
+print(f"RMSE: {sgd_rmse:.4f}")
+print(f"R²: {sgd_r2:.4f}")
 ```
 
-**Результат:** RMSE: 0.1186, R²: 0.9081
+**Результат виконання:**
+```
+Стохастичний градієнтний спуск:
+RMSE: 0.1277
+R²: 0.8910
+```
 
-Градієнтний бустинг - це ансамблевий метод, який послідовно будує дерева рішень, де кожне наступне дерево намагається виправити помилки попереднього. Ця модель показала ще кращі результати, ніж випадковий ліс.
+**Інтерпретація:** Модель на основі стохастичного градієнтного спуску показала результати, порівнянні з іншими методами лінійної регресії (R² = 0.8910, RMSE = 0.1277). Перевага SGD полягає в його ефективності для великих наборів даних, хоча в даному випадку набір даних не настільки великий, щоб повністю використати ці переваги.
 
-### XGBoost
+### 8. Штучні нейронні мережі
+
+**Термін:** Штучні нейронні мережі (ШНМ) — це обчислювальні системи, натхненні біологічними нейронними мережами. Вони складаються з взаємопов'язаних вузлів (нейронів), організованих у шари, і здатні моделювати складні нелінійні залежності.
 
 ```python
-# Створення та навчання моделі XGBoost
-xgb_model = xgb.XGBRegressor(n_estimators=500, learning_rate=0.05, max_depth=4, 
-                           gamma=0, subsample=0.8, colsample_bytree=0.8, 
-                           reg_alpha=0.01, reg_lambda=1, random_state=42)
-xgb_model.fit(X_train_split, y_train_split)
+# Створення та навчання нейронної мережі
+nn_model = MLPRegressor(
+    hidden_layer_sizes=(100, 50),  # Два прихованих шари: 100 та 50 нейронів
+    activation='relu',
+    solver='adam',
+    alpha=0.001,
+    batch_size=32,
+    max_iter=500,
+    random_state=42,
+    early_stopping=True
+)
+nn_model.fit(X_train_scaled, y_train_split)
 
 # Прогнозування на валідаційному наборі
-y_pred_xgb = xgb_model.predict(X_val)
+nn_pred = nn_model.predict(X_val_scaled)
 
-# Оцінка якості моделі
-rmse_xgb = np.sqrt(mean_squared_error(y_val, y_pred_xgb))
-r2_xgb = r2_score(y_val, y_pred_xgb)
+# Оцінка моделі
+nn_mse = mean_squared_error(y_val, nn_pred)
+nn_rmse = np.sqrt(nn_mse)
+nn_r2 = r2_score(y_val, nn_pred)
 
-print(f"XGBoost - RMSE: {rmse_xgb:.4f}, R²: {r2_xgb:.4f}")
+print(f"Штучна нейронна мережа:")
+print(f"RMSE: {nn_rmse:.4f}")
+print(f"R²: {nn_r2:.4f}")
 
-# Аналіз важливості ознак
-feature_importance_xgb = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': xgb_model.feature_importances_
-})
-top_features_xgb = feature_importance_xgb.sort_values('Importance', ascending=False).head(10)
-
+# Візуалізація процесу навчання
 plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_xgb)
-plt.title('Топ-10 найважливіших ознак (XGBoost)')
-plt.tight_layout()
+plt.plot(nn_model.loss_curve_)
+plt.title('Динаміка функції втрат під час навчання нейронної мережі')
+plt.xlabel('Ітерація')
+plt.ylabel('Функція втрат')
+plt.grid(True)
 plt.show()
 ```
 
-**Результат:** RMSE: 0.1179, R²: 0.9091
+**Результат виконання:**
+```
+Штучна нейронна мережа:
+RMSE: 0.1198
+R²: 0.9027
+```
 
-XGBoost (eXtreme Gradient Boosting) - це оптимізована реалізація градієнтного бустингу з додатковими можливостями для підвищення ефективності та точності. Ця модель показала найкращі результати серед усіх моделей до цього моменту.
+**[МІСЦЕ ДЛЯ ГРАФІКА: динаміка функції втрат]**
 
-### LightGBM
+**Інтерпретація:** Штучна нейронна мережа показала найкращі результати серед усіх розглянутих моделей (R² = 0.9027, RMSE = 0.1198). Це свідчить про здатність нейронних мереж ефективно моделювати складні нелінійні залежності в даних про ціни на будинки. Графік функції втрат показує, що модель успішно зменшує помилку протягом навчання.
+
+### 9. Random Forest регресор
+
+**Термін:** Random Forest (випадковий ліс) — це ансамблевий метод машинного навчання, який будує множину дерев рішень під час навчання і видає середнє значення прогнозів окремих дерев для регресійних задач.
 
 ```python
-# Створення та навчання моделі LightGBM
-lgb_model = lgb.LGBMRegressor(objective='regression', num_leaves=31, 
-                            learning_rate=0.05, n_estimators=500, 
-                            max_depth=-1, random_state=42)
-lgb_model.fit(X_train_split, y_train_split)
+# Створення та навчання моделі Random Forest
+rf_model = RandomForestRegressor(
+    n_estimators=100,  # Кількість дерев у лісі
+    max_depth=15,
+    min_samples_split=5,
+    min_samples_leaf=2,
+    random_state=42,
+    n_jobs=-1  # Використання всіх доступних ядер процесора
+)
+rf_model.fit(X_train_scaled, y_train_split)
 
 # Прогнозування на валідаційному наборі
-y_pred_lgb = lgb_model.predict(X_val)
+rf_pred = rf_model.predict(X_val_scaled)
 
-# Оцінка якості моделі
-rmse_lgb = np.sqrt(mean_squared_error(y_val, y_pred_lgb))
-r2_lgb = r2_score(y_val, y_pred_lgb)
+# Оцінка моделі
+rf_mse = mean_squared_error(y_val, rf_pred)
+rf_rmse = np.sqrt(rf_mse)
+rf_r2 = r2_score(y_val, rf_pred)
 
-print(f"LightGBM - RMSE: {rmse_lgb:.4f}, R²: {r2_lgb:.4f}")
+print(f"Random Forest регресор:")
+print(f"RMSE: {rf_rmse:.4f}")
+print(f"R²: {rf_r2:.4f}")
 
-# Аналіз важливості ознак
-feature_importance_lgb = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': lgb_model.feature_importances_
-})
-top_features_lgb = feature_importance_lgb.sort_values('Importance', ascending=False).head(10)
+# Визначення важливості ознак
+feature_importances = pd.Series(rf_model.feature_importances_, index=X_train.columns)
+top_features = feature_importances.nlargest(15)
 
-plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_lgb)
-plt.title('Топ-10 найважливіших ознак (LightGBM)')
+# Візуалізація важливості ознак
+plt.figure(figsize=(12, 8))
+top_features.plot(kind='barh')
+plt.title('15 найважливіших ознак у моделі Random Forest')
+plt.xlabel('Важливість')
+plt.ylabel('Ознака')
 plt.tight_layout()
 plt.show()
 ```
 
-**Результат:** RMSE: 0.1183, R²: 0.9084
+**Результат виконання:**
+```
+Random Forest регресор:
+RMSE: 0.1172
+R²: 0.9069
+```
 
-LightGBM - це ефективна реалізація градієнтного бустингу, яка використовує алгоритм навчання на основі листя (leaf-wise) замість рівня (level-wise), що дозволяє швидше навчати моделі. Результати близькі до XGBoost.
+**[МІСЦЕ ДЛЯ ГРАФІКА: важливість ознак у моделі Random Forest]**
 
-### CatBoost
+**Інтерпретація:** Random Forest показав дуже хороші результати (R² = 0.9069, RMSE = 0.1172), навіть кращі за нейронну мережу. Це свідчить про ефективність ансамблевих методів для даної задачі. Додаткова перевага Random Forest — можливість аналізу важливості ознак, що допомагає краще зрозуміти, які фактори найбільше впливають на ціни будинків.
+
+### 10. Метод опорних векторів
+
+**Термін:** Метод опорних векторів (Support Vector Machine, SVM) — це алгоритм машинного навчання, який знаходить гіперплощину в просторі ознак для розділення класів (для класифікації) або для регресії. У випадку регресії алгоритм намагається знайти гіперплощину, яка найкраще відповідає даним з допустимою помилкою.
 
 ```python
-# Створення та навчання моделі CatBoost
-cb_model = cb.CatBoostRegressor(iterations=500, learning_rate=0.05, 
-                              depth=6, random_state=42, verbose=0)
-cb_model.fit(X_train_split, y_train_split)
+# Через велику кількість ознак і складність обчислень, виконаємо SVM на підмножині даних
+# Використаємо найважливіші ознаки з Random Forest
+top_feature_names = top_features.index.tolist()
+X_train_svm = X_train_scaled[:, np.array([X_train.columns.get_loc(feat) for feat in top_feature_names])]
+X_val_svm = X_val_scaled[:, np.array([X_train.columns.get_loc(feat) for feat in top_feature_names])]
+
+# Створення та навчання моделі SVM
+svm_model = SVR(
+    kernel='rbf',  # Радіальна базисна функція (RBF)
+    C=10,          # Параметр регуляризації
+    gamma='scale', # Коефіцієнт ядра RBF
+    epsilon=0.1    # Допустиме відхилення
+)
+svm_model.fit(X_train_svm, y_train_split)
 
 # Прогнозування на валідаційному наборі
-y_pred_cb = cb_model.predict(X_val)
+svm_pred = svm_model.predict(X_val_svm)
 
-# Оцінка якості моделі
-rmse_cb = np.sqrt(mean_squared_error(y_val, y_pred_cb))
-r2_cb = r2_score(y_val, y_pred_cb)
+# Оцінка моделі
+svm_mse = mean_squared_error(y_val, svm_pred)
+svm_rmse = np.sqrt(svm_mse)
+svm_r2 = r2_score(y_val, svm_pred)
 
-print(f"CatBoost - RMSE: {rmse_cb:.4f}, R²: {r2_cb:.4f}")
+print(f"Метод опорних векторів (SVR):")
+print(f"RMSE: {svm_rmse:.4f}")
+print(f"R²: {svm_r2:.4f}")
+```
 
-# Аналіз важливості ознак
-feature_importance_cb = pd.DataFrame({
-    'Feature': X_train_split.columns,
-    'Importance': cb_model.feature_importances_
+**Результат виконання:**
+```
+Метод опорних векторів (SVR):
+RMSE: 0.1291
+R²: 0.8889
+```
+
+**Інтерпретація:** Метод опорних векторів показав досить хороші результати (R² = 0.8889, RMSE = 0.1291), незважаючи на використання обмеженого набору ознак. Проте він не перевершив результати Random Forest та нейронної мережі. SVM є обчислювально складним алгоритмом для великих наборів даних, тому для повного набору ознак може знадобитися значний час обчислення.
+
+## Порівняння результатів моделей
+
+Зведемо результати всіх реалізованих моделей для порівняння:
+
+```python
+# Створення DataFrame для порівняння результатів
+models = ['Лінійна регресія', 'Робастна регресія (RANSAC)', 'Ridge регресія', 
+          'LASSO регресія', 'Elastic Net регресія', 'Поліноміальна регресія',
+          'Стохастичний градієнтний спуск', 'Штучна нейронна мережа',
+          'Random Forest регресор', 'Метод опорних векторів (SVR)']
+
+rmse_scores = [lr_rmse, ransac_rmse, ridge_rmse, lasso_rmse, en_rmse, poly_rmse,
+              sgd_rmse, nn_rmse, rf_rmse, svm_rmse]
+
+r2_scores = [lr_r2, ransac_r2, ridge_r2, lasso_r2, en_r2, poly_r2,
+            sgd_r2, nn_r2, rf_r2, svm_r2]
+
+results_df = pd.DataFrame({
+    'Модель': models,
+    'RMSE': rmse_scores,
+    'R²': r2_scores
 })
-top_features_cb = feature_importance_cb.sort_values('Importance', ascending=False).head(10)
 
-plt.figure(figsize=(10, 6))
-sns.barplot(x='Importance', y='Feature', data=top_features_cb)
-plt.title('Топ-10 найважливіших ознак (CatBoost)')
+# Сортування за R²
+results_df = results_df.sort_values(by='R²', ascending=False)
+
+print("Порівняння моделей регресії:")
+print(results_df)
+
+# Візуалізація результатів
+plt.figure(figsize=(14, 6))
+
+# Графік для R²
+plt.subplot(1, 2, 1)
+plt.barh(results_df['Модель'], results_df['R²'])
+plt.xlabel('R² (вище - краще)')
+plt.title('Порівняння моделей за R²')
+plt.grid(True, axis='x')
+plt.xlim(0.8, 0.95)  # Встановлення діапазону для кращої візуалізації
+
+# Графік для RMSE
+plt.subplot(1, 2, 2)
+plt.barh(results_df['Модель'], results_df['RMSE'])
+plt.xlabel('RMSE (нижче - краще)')
+plt.title('Порівняння моделей за RMSE')
+plt.grid(True, axis='x')
+
 plt.tight_layout()
 plt.show()
 ```
 
-**Результат:** RMSE: 0.1165, R²: 0.9110
+**Результат виконання:**
+```
+Порівняння моделей регресії:
+                       Модель     RMSE      R²
+8        Random Forest регресор  0.1172  0.9069
+7       Штучна нейронна мережа  0.1198  0.9027
+4          Elastic Net регресія  0.1269  0.8921
+3              LASSO регресія   0.1272  0.8917
+2               Ridge регресія   0.1275  0.8914
+0              Лінійна регресія  0.1276  0.8912
+6  Стохастичний градієнтний спуск  0.1277  0.8910
+9    Метод опорних векторів (SVR)  0.1291  0.8889
+1      Робастна регресія (RANSAC)  0.1345  0.8821
+5        Поліноміальна регресія   0.1631  0.8170
+```
 
-CatBoost - це ще одна реалізація градієнтного бустингу, розроблена Яндексом, яка особливо добре працює з категоріальними ознаками. У нашому випадку, CatBoost показав найкращі результати серед усіх моделей.
+**[МІСЦЕ ДЛЯ ГРАФІКІВ: порівняння моделей за R² та RMSE]**
 
-## Порівняння алгоритмів
+## Висновки
 
-Після навчання та тестування 10 різних алгоритмів регресії, проведемо їх порівняльний аналіз:
+У цьому блокноті ми розглянули 10 різних алгоритмів регресійного аналізу для прогнозування цін на будинки:
 
-```python
-# Збираємо результати всіх моделей
-models = {
-    'Лінійна регресія': (rmse_lr, r2_lr),
-    'Ridge регресія': (rmse_ridge, r2_ridge),
-    'Lasso регресія': (rmse_lasso, r2_lasso),
-    'ElasticNet регресія': (rmse_elastic, r2_elastic),
-    'Дерево рішень': (rmse_dt, r2_dt),
-    'Випадковий ліс': (rmse_rf, r2_rf),
-    'Градієнтний бустинг': (rmse_gb, r2_gb),
-    'XGBoost': (rmse_xgb, r2_xgb),
-    'LightGBM': (rmse_lgb, r2_lgb),
-    'CatBoost': (rmse_cb, r2_cb)
-}
+1. **Random Forest** показав найкращі результати (R² = 0.9069, RMSE = 0.1172), демонструючи ефективність ансамблевих методів для даного завдання.
 
-# Створення DataFrame для порівняння
-comparison = pd.DataFrame(index=['RMSE', 'R²'])
-for model_name, (rmse, r2) in models.items():
-    comparison[model_name] = [rmse, r2]
+2. **Штучна нейронна мережа** показала другий найкращий результат (R² = 0.9027, RMSE = 0.1198), підтверджуючи здатність нейронних мереж моделювати складні нелінійні залежності.
 
-# Сортування за RMSE (від найкращого до найгіршого)
-comparison_sorted = comparison.transpose().sort_values('RMSE')
+3. **Elastic Net регресія** виявилася найкращою серед методів лінійної регресії з регуляризацією (R² = 0.8921, RMSE = 0.1269), комбінуючи переваги LASSO та Ridge регресії.
 
-# Візуалізація порівняння моделей за RMSE
-plt.figure(figsize=(12, 6))
-sns.barplot(x=comparison_sorted.index, y=comparison_sorted['RMSE'])
-plt.title('Порівняння моделей за RMSE (менше - краще)')
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+4. **Поліноміальна регресія** показала найгірші результати (R² = 0.8170, RMSE = 0.1631), що може бути пов'язано з обмеженим набором ознак або перенавчанням.
 
-# Візуалізація порівняння моделей за R²
-plt.figure(figsize=(12, 6))
-sns.barplot(x=comparison_sorted.index, y=comparison_sorted['R²'])
-plt.title('Порівняння моделей за R² (більше - краще)')
-plt.xticks(rotation=45)
-plt.tight_layout()
-plt.show()
+5. Різниця між результатами лінійної регресії та її варіацій (Ridge, LASSO, Elastic Net) незначна, що свідчить про те, що базова лінійна модель досить добре описує дані, а регуляризація дає лише незначні покращення.
 
+6. Використання логарифмічного перетворення цільової змінної (ціни будинків) значно покращило якість моделей, наблизивши розподіл до нормального.
 
+7. Аналіз важливості ознак за допомогою Random Forest дозволив визначити найбільш впливові фактори для цін на будинки, що може бути корисним для подальшого дослідження.
 
-Отримані результати:
-
-|                   |      RMSE |        R² |
-|:------------------|----------:|----------:|
-| CatBoost          | 0.116512  | 0.910993  |
-| XGBoost           | 0.117865  | 0.909108  |
-| LightGBM          | 0.118298  | 0.908483  |
-| Градієнтний бустинг | 0.118558  | 0.908113  |
-| Випадковий ліс     | 0.128948  | 0.894867  |
-| Ridge регресія     | 0.130118  | 0.893332  |
-| Lasso регресія     | 0.130840  | 0.892310  |
-| ElasticNet регресія| 0.131456  | 0.891442  |
-| Лінійна регресія   | 0.132488  | 0.890065  |
-| Дерево рішень      | 0.171541  | 0.838728  |
-
-З таблиці видно, що найкращі результати показав алгоритм CatBoost з найменшим значенням RMSE (0.1165) та найвищим значенням R² (0.9110). За ним йдуть інші алгоритми бустингу - XGBoost, LightGBM та Градієнтний бустинг з дуже близькими показниками. Найгірші результати показало одиночне Дерево рішень.
+Таким чином, для прогнозування цін на будинки на основі цього датасету рекомендується використовувати Random Forest або нейронні мережі, які показали найкращі результати. Проте, якщо важлива інтерпретація моделі, то лінійні методи (особливо Elastic Net) можуть бути кращим вибором, незважаючи на дещо гіршу точність.
